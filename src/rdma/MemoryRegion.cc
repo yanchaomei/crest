@@ -28,14 +28,16 @@ MemoryRegion::MemoryRegion(Context *ctx, size_t alloc_sz, bool on_chip, int flag
   if (!on_chip) {
     auto s = posix_memalign(&buf_addr_, RdmaConfig::PageSize, alloc_sz);
     if (s || buf_addr_ == nullptr) {
-      abort();
+      LOG_FATAL("posix_memalign failed: size=%zu, error=%d (%s)",
+                alloc_sz, s, strerror(s));
     }
 
     std::memset(buf_addr_, 0, alloc_sz);
 
     this->ibv_mr_ = ibv_reg_mr(ctx->get_ib_pd(), this->buf_addr_, this->buf_sz_, flags);
     if (!this->ibv_mr_) {
-      abort();
+      LOG_FATAL("ibv_reg_mr failed: addr=%p, size=%zu, errno=%d (%s)",
+                buf_addr_, buf_sz_, errno, strerror(errno));
     }
     buf_owner_ = true;
   } else {
@@ -67,10 +69,14 @@ MemoryRegion::MemoryRegion(Context *ctx, size_t alloc_sz, bool on_chip, int flag
 MemoryRegion::MemoryRegion(Context *ctx, void *buf_addr, size_t buf_sz, int flags)
     : ctx_(ctx), buf_addr_(buf_addr), buf_sz_(buf_sz) {
   this->ibv_mr_ = ibv_reg_mr(ctx->get_ib_pd(), this->buf_addr_, this->buf_sz_, flags);
+  if (!this->ibv_mr_) {
+    LOG_FATAL("ibv_reg_mr (external buf) failed: addr=%p, size=%zu, errno=%d (%s)",
+              buf_addr_, buf_sz_, errno, strerror(errno));
+  }
 }
 
 MemoryRegion::~MemoryRegion() {
-  ibv_dereg_mr(this->ibv_mr_);
+  if (this->ibv_mr_) ibv_dereg_mr(this->ibv_mr_);
   if (this->ibv_dm_) {
     ibv_exp_free_dm(this->ibv_dm_);
   }

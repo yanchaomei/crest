@@ -12,6 +12,7 @@
 namespace rdma {
 
 void RDMABatch::PostWrite(void *laddr, size_t sz, void *raddr, int flags) {
+  ASSERT(sz_ < MAX_BATCH_WR_NUM, "RDMABatch overflow: %zu >= %zu", sz_, MAX_BATCH_WR_NUM);
   size_t id = sz_++;
 
   ibv_sge &sge = sges_[id];
@@ -29,6 +30,7 @@ void RDMABatch::PostWrite(void *laddr, size_t sz, void *raddr, int flags) {
 }
 
 void RDMABatch::PostRead(void *raddr, size_t sz, void *laddr, int flags) {
+  ASSERT(sz_ < MAX_BATCH_WR_NUM, "RDMABatch overflow: %zu >= %zu", sz_, MAX_BATCH_WR_NUM);
   size_t id = sz_++;
 
   ibv_sge &sge = sges_[id];
@@ -46,6 +48,7 @@ void RDMABatch::PostRead(void *raddr, size_t sz, void *laddr, int flags) {
 }
 
 void RDMABatch::PostCAS(void *laddr, void *raddr, uint64_t compare, uint64_t swap, int flags) {
+  ASSERT(sz_ < MAX_BATCH_WR_NUM, "RDMABatch overflow: %zu >= %zu", sz_, MAX_BATCH_WR_NUM);
   size_t id = sz_++;
 
   ibv_sge &sge = sges_[id];
@@ -86,6 +89,9 @@ void RDMABatch::PostFAA(void *laddr, void *raddr, uint64_t inc, int flags) {
 }
 
 util::Status RDMABatch::SendRequest(QueuePair *qp) {
+  if (sz_ == 0) {
+    return util::Status(util::kNetworkError, "RDMABatch::SendRequest called with empty batch");
+  }
   for (size_t i = 0; i < sz_; ++i) {
     sges_[i].lkey = qp->GetLocalMemoryRegionToken().get_local_key();
     if (wrs_[i].opcode == IBV_WR_ATOMIC_CMP_AND_SWP ||

@@ -317,9 +317,13 @@ constexpr int CONST_STATE_NAME_COUNT = 12;
 constexpr const char* state_name[CONST_STATE_NAME_COUNT] = {"AB", "BC", "CD", "DE", "EF", "FG",
                                                             "GH", "HI", "IJ", "JK", "KL", "LM"};
 
-constexpr int MAX_ORDERID_PER_DISTRICT = 20000;
+// Reduced from 20000/1000 to fit within CloudLab MR limits (128GB nodes).
+// Original values pre-allocated 38GB+ of hash tables for 40 warehouses,
+// causing MR overflow and kernel panic on 32GB MR.
+// New values are still sufficient for 100K-1M transactions.
+constexpr int MAX_ORDERID_PER_DISTRICT = 3000;
 
-constexpr int MAX_PAYMENT_CNT_PER_CUSTOMER = 1000;
+constexpr int MAX_PAYMENT_CNT_PER_CUSTOMER = 100;
 
 constexpr char warehouse_table_name[] = "Warehouse ";
 

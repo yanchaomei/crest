@@ -18,25 +18,22 @@
 #include "util/Status.h"
 
 namespace rdma {
-QueuePair::QueuePair(Context *ctx, MemoryRegionToken mr_token) : ctx_(ctx), lmr_token_(mr_token) {
+QueuePair::QueuePair(Context *ctx, MemoryRegionToken mr_token)
+    : ctx_(ctx), lmr_token_(mr_token), ibv_qp_(nullptr), send_cq_(nullptr), recv_cq_(nullptr),
+      sequence_number_(0) {
   // Create completion queue:
   this->send_cq_ = ibv_create_cq(ctx_->get_ib_context(), 16534, nullptr, nullptr, 0);
   this->recv_cq_ = ibv_create_cq(ctx_->get_ib_context(), 16534, nullptr, nullptr, 0);
   if (!this->send_cq_ || !this->recv_cq_) {
-    LOG_ERROR("Create completion queue failed");
+    LOG_FATAL("Create completion queue failed: errno=%d (%s)", errno, strerror(errno));
   }
 
-  // auto qp_init_attr = DefaultQPInitAttr();
-  // this->ibv_qp_ = ibv_create_qp(ctx->get_ib_pd(), &qp_init_attr);
-
   // To enable the experimental verbs, we must call ibv_exp_create_qp instead of ibv_create_qp
-  // defined in the core verbs.
   auto qp_init_attr = DefaultExpQPInitAttr(ctx_);
   this->ibv_qp_ = ibv_exp_create_qp(ctx->get_ib_context(), &qp_init_attr);
   if (!this->ibv_qp_) {
-    LOG_ERROR("Create queue pair failed");
+    LOG_FATAL("Create queue pair failed: errno=%d (%s)", errno, strerror(errno));
   }
-  this->sequence_number_ = 0;
 }
 
 util::Status QueuePair::Init() {

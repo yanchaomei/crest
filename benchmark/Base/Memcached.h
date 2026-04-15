@@ -85,22 +85,36 @@ class MemcachedWrapper {
   }
 
   void SyncComputeNodes() {
-    LOG_INFO("Synchronizing all compute nodes...");
+    LOG_INFO("Synchronizing all compute nodes (expecting %u)...", max_server_num);
     size_t l;
     uint32_t flags;
     memcached_return rc;
     int curr_server_num = 1;
+    int retry_count = 0;
+    const int MAX_RETRIES = 300;  // 30 seconds at 100ms interval
     // Wait until all servers are ready
-    while (curr_server_num < max_server_num) {
+    while (curr_server_num < max_server_num && retry_count < MAX_RETRIES) {
       char *serverNumStr =
           memcached_get(memc, SERVER_NUM_KEY, strlen(SERVER_NUM_KEY), &l, &flags, &rc);
       if (rc != MEMCACHED_SUCCESS) {
-        LOG_ERROR("Server %d Counld't get serverNum, Error Info: %s, retry\n", node_id,
-                  memcached_strerror(memc, rc));
+        LOG_ERROR("Server %d Counld't get serverNum, Error Info: %s, retry (%d/%d)\n", node_id,
+                  memcached_strerror(memc, rc), retry_count, MAX_RETRIES);
+        retry_count++;
+        usleep(100000);  // 100ms between retries
+        continue;
+      }
+      if (serverNumStr == nullptr) {
+        retry_count++;
+        usleep(100000);
         continue;
       }
       curr_server_num = atoi(serverNumStr);
       free(serverNumStr);
+      retry_count = 0;  // Reset on success
+    }
+    if (curr_server_num < max_server_num) {
+      LOG_FATAL("Synchronization timeout: only %d/%u servers ready after %d retries",
+                curr_server_num, max_server_num, MAX_RETRIES);
     }
     LOG_INFO("Synchronization Done");
   }

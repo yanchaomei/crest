@@ -82,20 +82,20 @@ QueuePair *QueuePairFactory::WaitForIncomingConnection(Context *ctx, MemoryRegio
 
   // Read queue pair information formation from incomming request
   if (auto s = ExchangeQueuePairInfo(local_qp, remote_qp, connect_socket, true); !s.ok()) {
+    delete qp;
     return nullptr;
   }
-
-  // logger::LOG(logger::kYellow, "WaitForIncommingConnection: recv data: %s",
-  //             remote_qp->ToString().c_str());
 
   // Init and activate the queue pair
   if (auto s = qp->Init(); !s.ok()) {
     LOG_ERROR("QueuePair initialized Failed");
+    delete qp;
     return nullptr;
   }
 
   if (auto s = qp->Activate(remote_qp); !s.ok()) {
     LOG_FATAL("QueuePair Activate Failed");
+    delete qp;
     return nullptr;
   }
 
@@ -120,8 +120,16 @@ util::Status QueuePairFactory::ConnectToRemoteHost(std::string ip, uint16_t port
     return util::Status(util::kNetworkError, errno, "Create socket failed");
   }
 
+  // Set socket timeout for connect/send/recv
+  struct timeval tv;
+  tv.tv_sec = 5;
+  tv.tv_usec = 0;
+  setsockopt(connect_socket, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+  setsockopt(connect_socket, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
+
   int ret_value = connect(connect_socket, (sockaddr *)&(remote_addr), sizeof(sockaddr_in));
   if (ret_value < 0) {
+    close(connect_socket);
     *qp = nullptr;
     return util::Status(util::kNetworkError, errno, "Connect to remote socket (%s, %d) failed",
                         ip.c_str(), port);
