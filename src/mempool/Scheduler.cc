@@ -43,7 +43,12 @@ util::Status CoroutineScheduler::PostWrite(coro_id_t coro_id, node_id_t nid, Que
 util::Status CoroutineScheduler::PostRead(coro_id_t coro_id, node_id_t nid, QueuePair *qp,
                                           void *raddr, size_t sz, void *laddr, int flags) {
     ASSERT(CheckLocalMemoryRegionBound(qp, laddr, sz), "");
-    ASSERT(CheckRemoteMemoryRegionBound(qp, raddr, sz), "");
+    if (!CheckRemoteMemoryRegionBound(qp, raddr, sz)) {
+        auto rmr = qp->GetRemoteMemoryRegionToken();
+        LOG_ERROR("RemoteMR OOB: raddr=%p sz=%lu mr_base=%lu mr_bound=%lu",
+                  raddr, sz, rmr.get_region_addr(), rmr.get_region_bound());
+        ASSERT(false, "RemoteMR bound check failed");
+    }
     auto s = qp->PostRead(raddr, sz, laddr, (RequestToken *)GenerateWrId(coro_id), flags);
     if (s.ok() && IsSignaled(flags)) [[likely]] {
         pending_request_num_[coro_id][nid]++;

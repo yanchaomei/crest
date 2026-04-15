@@ -81,4 +81,10 @@ util::Status Context::Init(uint32_t cqe) {
   return util::Status::OK();
 }
 
+Context::~Context() {
+  if (ibv_pd_) ibv_dealloc_pd(ibv_pd_);
+  if (ibv_ctx_) ibv_close_device(ibv_ctx_);
+  if (dev_lists_) ibv_free_device_list(dev_lists_);
+}
+
 };  // namespace rdma

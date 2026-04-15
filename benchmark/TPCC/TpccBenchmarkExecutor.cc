@@ -402,6 +402,7 @@ Status TpccBenchmark::Initialize(const BenchmarkConfig& config) {
         meta_page = bench_db_->GetTable(tpcc::ITEM_TABLE)->SerializeTableInfo(meta_page);
         meta_page = bench_db_->GetTable(tpcc::STOCK_TABLE)->SerializeTableInfo(meta_page);
         LOG_INFO("MN write database metadata done");
+        LOG_INFO("DBG MN: mr_addr=%p meta_first8=%#lx", mr_addr, *(uint64_t*)mr_addr);
         LOG_INFO("MN Initialization Takes %.2lf ms", timer.ms_elapse());
 
         Status s = this->pool_->BuildConnection(config_.pool_attr, config_.thread_num);
@@ -423,6 +424,7 @@ Status TpccBenchmark::Initialize(const BenchmarkConfig& config) {
             Status s = qp->Read((void*)(qp->GetRemoteMemoryRegionToken().get_region_addr()), 4096,
                                 db_meta_pages.back(), &token);
             ASSERT(s.ok(), "fetch database metadata failed");
+            LOG_INFO("DBG: meta page[%d] read ok, first8=%#lx", id, *(uint64_t*)db_meta_pages.back());
         }
 
         rdma::QueuePair* qp = thread_ctxs_[0].pool->GetQueuePair(0);
@@ -499,6 +501,7 @@ Status TpccBenchmark::Initialize(const BenchmarkConfig& config) {
 Status TpccBenchmark::InitDatabaseMeta(ThreadCtx* t_ctx, char* db_meta_page, bool primary_log) {
     const char* p = db_meta_page;
     PoolPtr log_area = Next<PoolPtr>(p);
+    LOG_INFO("DBG: log_area=%#lx meta_first8=%#lx", log_area, *(uint64_t*)db_meta_page);
     p = t_ctx->db->GetTable(tpcc::WAREHOUSE_TABLE)->DeserializeTableInfo(p);
     p = t_ctx->db->GetTable(tpcc::DISTRICT_TABLE)->DeserializeTableInfo(p);
     p = t_ctx->db->GetTable(tpcc::CUSTOMER_TABLE)->DeserializeTableInfo(p);

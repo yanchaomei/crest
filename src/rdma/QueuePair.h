@@ -76,9 +76,9 @@ class QueuePair {
  public:
   QueuePair(Context *ctx, MemoryRegionToken mr_token);
   ~QueuePair() {
-    // for (const auto& [t, hist] : metrics_) {
-    //   delete hist;
-    // }
+    if (ibv_qp_) ibv_destroy_qp(ibv_qp_);
+    if (send_cq_) ibv_destroy_cq(send_cq_);
+    if (recv_cq_) ibv_destroy_cq(recv_cq_);
   }
 
   // Change the states of queue pair to Init

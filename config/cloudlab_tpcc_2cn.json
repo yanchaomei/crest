@@ -1,0 +1,10 @@
+{
+  "mn": [
+    {"id": 0, "ip": "128.110.219.23", "devname": "mlx5_0", "ibport": 1, "gid": 3, "mr_size": 32}
+  ],
+  "cn": [
+    {"id": 0, "ip": "128.110.219.29", "devname": "mlx5_0", "ibport": 1, "gid": 3, "mr_size": 4},
+    {"id": 1, "ip": "128.110.219.14", "devname": "mlx5_0", "ibport": 1, "gid": 3, "mr_size": 4}
+  ],
+  "tpcc": {"num_warehouse": 40, "num_district_per_warehouse": 10, "num_customer_per_district": 300, "num_stock_per_warehouse": 10000, "num_item": 10000}
+}

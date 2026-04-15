@@ -1,0 +1,44 @@
+{
+  "mn": [
+    {
+      "id": 0,
+      "ip": "128.110.219.18",
+      "devname": "mlx5_0",
+      "ibport": 1,
+      "gid": 3,
+      "mr_size": 64
+    }
+  ],
+  "cn": [
+    {
+      "id": 0,
+      "ip": "128.110.219.14",
+      "devname": "mlx5_0",
+      "ibport": 1,
+      "gid": 3,
+      "mr_size": 4
+    },
+    {
+      "id": 1,
+      "ip": "128.110.219.29",
+      "devname": "mlx5_0",
+      "ibport": 1,
+      "gid": 3,
+      "mr_size": 4
+    },
+    {
+      "id": 2,
+      "ip": "128.110.219.23",
+      "devname": "mlx5_0",
+      "ibport": 1,
+      "gid": 3,
+      "mr_size": 4
+    }
+  ],
+  "ycsb": {
+    "num_records": 1000000,
+    "zipfian": 0.99,
+    "num_op": 4,
+    "write_ratio": 100
+  }
+}

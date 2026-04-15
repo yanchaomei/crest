@@ -1,4 +1,5 @@
 #include <gflags/gflags.h>
+#include <csignal>
 
 #include "SmallBank/SmallBankBenchmark.h"
 #include "SmallBank/SmallBankContext.h"
@@ -25,6 +26,16 @@ DEFINE_bool(replay, false, "Whether replay the benchmark to test correctness");
 DEFINE_string(output, "", "Path to the output file");
 
 static constexpr uint16_t kSocketPort = 10001;
+
+static Benchmark* g_bench = nullptr;
+void signal_handler(int sig) {
+    LOG_INFO("Caught signal %d, cleaning up RDMA resources...", sig);
+    if (g_bench) {
+        delete g_bench;
+        g_bench = nullptr;
+    }
+    exit(1);
+}
 
 Benchmark::BenchmarkConfig ParseBenchmarkConfig() {
     ASSERT(FLAGS_id >= 0, "Invalid node id");
@@ -129,6 +140,9 @@ int main(int argc, char* argv[]) {
     Benchmark::BenchmarkConfig bench_config = ParseBenchmarkConfig();
     LOG_INFO("Read configuration file succeed");
 
+    signal(SIGTERM, signal_handler);
+    signal(SIGINT, signal_handler);
+
     Benchmark* bench = nullptr;
     if (FLAGS_workload == "tpcc") {
         bench = new TpccBenchmark();
@@ -139,6 +153,8 @@ int main(int argc, char* argv[]) {
     } else if (FLAGS_workload == "tatp") {
         bench = new TATPBenchmark();
     }
+
+    g_bench = bench;
 
     util::Timer timer;
 
@@ -152,11 +168,9 @@ int main(int argc, char* argv[]) {
     s = bench->Run();
     ASSERT(s.ok(), "benchmark run failed");
 
-    if (FLAGS_workload == "tpcc") {
-        // delete (TpccBenchmark*)bench;
-    } else if (FLAGS_workload == "smallbank") {
-        // delete (SmallBankBenchmark*)bench;
-    }
+    // Clean up RDMA resources on normal exit
+    delete bench;
+    g_bench = nullptr;
 
     return 0;
 }

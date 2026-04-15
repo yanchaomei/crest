@@ -539,7 +539,8 @@ ibv_qp_attr QueuePair::DefaultQPAttrForRTR(const SerializedQueuePair *qp_info) {
   ret.qp_state = IBV_QPS_RTR;
 
   // Match this attribute with your device
-  ret.path_mtu = IBV_MTU_4096;
+  // CloudLab c6525-25g active_mtu is 1024
+  ret.path_mtu = IBV_MTU_1024;
 
   ret.dest_qp_num = qp_info->qp_num;
   ret.rq_psn = 0;
