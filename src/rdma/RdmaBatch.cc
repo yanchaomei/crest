@@ -8,6 +8,8 @@
 #include "rdma/QueuePair.h"
 #include "rdma/RdmaConfig.h"
 #include "util/Status.h"
+#include "util/Logger.h"
+#include "util/Macros.h"
 
 namespace rdma {
 

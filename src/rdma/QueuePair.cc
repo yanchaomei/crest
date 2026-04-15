@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 
 #include <cassert>
+#include <cerrno>
 #include <cstdint>
 #include <memory>
 
@@ -54,6 +55,8 @@ util::Status QueuePair::Activate(const SerializedQueuePair *qp_info) {
                                IBV_QP_RQ_PSN | IBV_QP_MIN_RNR_TIMER | IBV_QP_MAX_DEST_RD_ATOMIC);
 
   if (ret != 0) {
+    LOG_ERROR("Modify QP to RTR failed: ret=%d errno=%d (%s) dest_qpn=%u path_mtu=%d",
+              ret, errno, strerror(errno), qp_info->qp_num, qp_attr.path_mtu);
     return util::Status(util::kNetworkError, errno, "Modify QP Status to RTR failed");
   }
 
@@ -63,6 +66,7 @@ util::Status QueuePair::Activate(const SerializedQueuePair *qp_info) {
                           IBV_QP_SQ_PSN | IBV_QP_MAX_QP_RD_ATOMIC);
 
   if (ret != 0) {
+    LOG_ERROR("Modify QP to RTS failed: ret=%d errno=%d (%s)", ret, errno, strerror(errno));
     return util::Status(util::kNetworkError, errno, "Modify QP Status to RTS failed");
   }
 

@@ -177,7 +177,7 @@ const double INITIAL_D_YTD = 30000.00;
 const std::string DISTRICT_ZIP_SUFFIX = "11111";
 
 const int DISTRICT_INITIAL_NEXT_O_ID = 31;  // origin : 3001
-const int DISTRICT_MAX_OID = 20000;
+const int DISTRICT_MAX_OID = 3000;  // Must match MAX_ORDERID_PER_DISTRICT
 //  DISTRICT TABLE CONSTANTS ENDS ------------------------
 
 // ---------------------- DISTRICT TABLE CONSTANTS BEGIN
