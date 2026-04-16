@@ -402,6 +402,7 @@ Status TpccBenchmark::Initialize(const BenchmarkConfig& config) {
         meta_page = bench_db_->GetTable(tpcc::ITEM_TABLE)->SerializeTableInfo(meta_page);
         meta_page = bench_db_->GetTable(tpcc::STOCK_TABLE)->SerializeTableInfo(meta_page);
         LOG_INFO("MN write database metadata done");
+        __sync_synchronize();  // Flush CPU writes for DMA visibility
         LOG_INFO("DBG MN: mr_addr=%p meta_first8=%#lx second8=%#lx",
                  mr_addr, *(uint64_t*)mr_addr, *(uint64_t*)(mr_addr + 8));
         LOG_INFO("DBG MN: mr_token region_addr=%#lx region_size=%lu lkey=%u rkey=%u",
@@ -429,17 +430,33 @@ Status TpccBenchmark::Initialize(const BenchmarkConfig& config) {
                      id, rmr.get_region_addr(), rmr.get_region_size(), rmr.get_remote_key());
             LOG_INFO("DBG CN: local_dst=%p", db_meta_pages.back());
 
-            // Retry RDMA read up to 10 times if data is all zeros
-            // (workaround for possible RDMA caching/ordering issue)
-            for (int retry = 0; retry < 10; ++retry) {
+            // RDMA read is async — must poll CQ for completion before reading data
+            {
                 RequestToken token;
                 Status s = qp->Read((void*)(rmr.get_region_addr()), 4096,
                                     db_meta_pages.back(), &token);
                 ASSERT(s.ok(), "fetch database metadata failed");
+
+                // Poll CQ until completion (Read was posted with SIGNAL flag)
+                struct ibv_wc wc;
+                auto send_cq = qp->GetSendCQ();
+                int poll_count = 0;
+                while (true) {
+                    int n = ibv_poll_cq(send_cq, 1, &wc);
+                    if (n > 0) {
+                        if (wc.status != IBV_WC_SUCCESS) {
+                            LOG_FATAL("Metadata RDMA read failed: status=%d (%s)",
+                                     wc.status, ibv_wc_status_str(wc.status));
+                        }
+                        break;
+                    }
+                    if (++poll_count > 10000000) {
+                        LOG_FATAL("Metadata RDMA read CQ poll timeout");
+                    }
+                }
                 uint64_t first8 = *(uint64_t*)db_meta_pages.back();
-                LOG_INFO("DBG: meta page[%d] retry=%d first8=%#lx", id, retry, first8);
-                if (first8 != 0) break;
-                usleep(500000);  // 500ms between retries
+                LOG_INFO("DBG: meta page[%d] first8=%#lx (after CQ poll)", id, first8);
+                ASSERT(first8 != 0, "Metadata read returned zeros even after CQ completion");
             }
         }
 
