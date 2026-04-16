@@ -402,7 +402,11 @@ Status TpccBenchmark::Initialize(const BenchmarkConfig& config) {
         meta_page = bench_db_->GetTable(tpcc::ITEM_TABLE)->SerializeTableInfo(meta_page);
         meta_page = bench_db_->GetTable(tpcc::STOCK_TABLE)->SerializeTableInfo(meta_page);
         LOG_INFO("MN write database metadata done");
-        LOG_INFO("DBG MN: mr_addr=%p meta_first8=%#lx", mr_addr, *(uint64_t*)mr_addr);
+        LOG_INFO("DBG MN: mr_addr=%p meta_first8=%#lx second8=%#lx",
+                 mr_addr, *(uint64_t*)mr_addr, *(uint64_t*)(mr_addr + 8));
+        LOG_INFO("DBG MN: mr_token region_addr=%#lx region_size=%lu lkey=%u rkey=%u",
+                 mr_token.get_region_addr(), mr_token.get_region_size(),
+                 mr_token.get_local_key(), mr_token.get_remote_key());
         LOG_INFO("MN Initialization Takes %.2lf ms", timer.ms_elapse());
 
         Status s = this->pool_->BuildConnection(config_.pool_attr, config_.thread_num);
@@ -420,11 +424,23 @@ Status TpccBenchmark::Initialize(const BenchmarkConfig& config) {
         for (int id = 0; id < num_mns; ++id) {
             db_meta_pages.push_back(id * 4096 + mr_addr);
             rdma::QueuePair* qp = thread_ctxs_[0].pool->GetQueuePair(id);
-            RequestToken token;
-            Status s = qp->Read((void*)(qp->GetRemoteMemoryRegionToken().get_region_addr()), 4096,
-                                db_meta_pages.back(), &token);
-            ASSERT(s.ok(), "fetch database metadata failed");
-            LOG_INFO("DBG: meta page[%d] read ok, first8=%#lx", id, *(uint64_t*)db_meta_pages.back());
+            auto rmr = qp->GetRemoteMemoryRegionToken();
+            LOG_INFO("DBG CN: MN%d rmr_addr=%#lx rmr_size=%lu rmr_rkey=%u",
+                     id, rmr.get_region_addr(), rmr.get_region_size(), rmr.get_remote_key());
+            LOG_INFO("DBG CN: local_dst=%p", db_meta_pages.back());
+
+            // Retry RDMA read up to 10 times if data is all zeros
+            // (workaround for possible RDMA caching/ordering issue)
+            for (int retry = 0; retry < 10; ++retry) {
+                RequestToken token;
+                Status s = qp->Read((void*)(rmr.get_region_addr()), 4096,
+                                    db_meta_pages.back(), &token);
+                ASSERT(s.ok(), "fetch database metadata failed");
+                uint64_t first8 = *(uint64_t*)db_meta_pages.back();
+                LOG_INFO("DBG: meta page[%d] retry=%d first8=%#lx", id, retry, first8);
+                if (first8 != 0) break;
+                usleep(500000);  // 500ms between retries
+            }
         }
 
         rdma::QueuePair* qp = thread_ctxs_[0].pool->GetQueuePair(0);
